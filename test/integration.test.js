@@ -203,7 +203,7 @@ test('Publish the package on a dist-tag', async t => {
 
   const result = await t.context.m.publish(
     {},
-    {cwd, env, options: {}, logger: t.context.logger, nextRelease: {version: '1.0.0'}}
+    {cwd, env, options: {}, logger: t.context.logger, nextRelease: {channel: 'next', version: '1.0.0'}}
   );
 
   t.deepEqual(result, {name: 'npm package (@next dist-tag)', url: 'https://www.npmjs.com/package/publish-tag'});
@@ -416,7 +416,7 @@ test('Throw SemanticReleaseError Array if config option are not valid in prepare
   t.is(errors[3].code, 'ENOPKG');
 });
 
-test('Verify token and set up auth only on the fist call, then prepare on prepare call only', async t => {
+test.only('Verify token and set up auth only on the fist call, then prepare on prepare call only', async t => {
   const cwd = tempy.directory();
   const env = npmRegistry.authEnv;
   const pkg = {name: 'test-module', version: '0.0.0-dev', publishConfig: {registry: npmRegistry.url}};
@@ -425,9 +425,24 @@ test('Verify token and set up auth only on the fist call, then prepare on prepar
   await t.notThrows(t.context.m.verifyConditions({}, {cwd, env, options: {}, logger: t.context.logger}));
   await t.context.m.prepare({}, {cwd, env, options: {}, logger: t.context.logger, nextRelease: {version: '1.0.0'}});
 
-  const result = await t.context.m.publish(
+  let result = await t.context.m.publish(
     {},
-    {cwd, env, options: {}, logger: t.context.logger, nextRelease: {version: '1.0.0'}}
+    {cwd, env, options: {}, logger: t.context.logger, nextRelease: {channel: 'next', version: '1.0.0'}}
   );
+  t.deepEqual(result, {name: 'npm package (@next dist-tag)', url: undefined});
+  t.is(
+    await execa.stdout('npm', ['view', pkg.name, 'dist-tags.next'], {cwd, env: {...npmRegistry.authEnv, LEGACY_TOKEN}}),
+    '1.0.0'
+  );
+
+  result = await t.context.m.addChannel({}, {logger: t.context.logger, nextRelease: {version: '1.0.0'}});
+
   t.deepEqual(result, {name: 'npm package (@latest dist-tag)', url: undefined});
+  t.is(
+    await execa.stdout('npm', ['view', pkg.name, 'dist-tags.latest'], {
+      cwd,
+      env: {...npmRegistry.authEnv, LEGACY_TOKEN},
+    }),
+    '1.0.0'
+  );
 });
